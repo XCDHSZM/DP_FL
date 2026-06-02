@@ -129,7 +129,8 @@ def fed_train(command_str):
     dp_mechanism = args.dp_mechanism
     dp_clip = args.dp_clip
     # use opacus to wrap model to clip per sample gradient
-    net_glob = GradSampleModule(net_glob)
+    #不要在这里包装全局模型
+    # net_glob = GradSampleModule(net_glob)
     # print(net_glob)
     net_glob.train()
 
@@ -159,7 +160,24 @@ def fed_train(command_str):
             local_client = Client(args=args, dataset=dataset_train, idxs=dict_users[idx],
                                   dp_alpha=dp_alpha, dp_epsilon=dp_epsilon, dp_delta=dp_delta,
                                   dp_mechanism=dp_mechanism, dp_composition=dp_composition, dp_clip=dp_clip)
-            w, loss, curLR = local_client.train(net=copy.deepcopy(net_glob).to(args.device))
+            # 1. 复制纯净的全局模型
+            net_local = copy.deepcopy(net_glob).to(args.device)
+            
+            # 2. 如果开启了 DP，仅在本地对模型进行 Opacus 包装
+            if args.dp_mechanism != 'no_dp':
+                net_local = GradSampleModule(net_local)
+            
+            # 3. 传入本地模型进行训练
+            w, loss, curLR = local_client.train(net=net_local)
+            
+            # 4. 解包：Opacus 包装后的模型参数键名会带有 '_module.' 前缀。
+            # 我们需要把它切掉，以保证和纯净的全局模型键名对齐，否则 FedAvg 会报错
+            if args.dp_mechanism != 'no_dp':
+                w_stripped = {}
+                for k, v in w.items():
+                    w_stripped[k.replace('_module.', '')] = v
+                w = w_stripped
+            
             learning_rate[idx] = curLR
             # print("afterlearning learning_rate[idx]", learning_rate[idx])
             w_locals.append(copy.deepcopy(w))
