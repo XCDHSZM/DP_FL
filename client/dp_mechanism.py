@@ -36,8 +36,8 @@ def gaussian_mechanism(epsilon, delta, sensitivity, size):
     :param size: 数据大小，即生成的噪声列表大小
     :return :生成的噪声列表
     """
-    if epsilon >= 1:
-        raise ValueError("Epsilon of Gaussian mechanism should be greater than 0 and less than 1!")
+    # if epsilon >= 1:
+    #     raise ValueError("Epsilon of Gaussian mechanism should be greater than 0 and less than 1!")
     noise_scale = np.sqrt(2 * np.log(1.25 / delta)) * sensitivity / epsilon
     return np.random.normal(0, noise_scale, size=size)
 
